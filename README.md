@@ -22,6 +22,14 @@ Future
 * Automation for clients - pick/write an algorithm rather than manually expanding.
 * Many things to make it nicer to play.
 
+How to use
+----------
+
+1. Requires [PIL](http://www.pythonware.com/products/pil/): make sure this is installed 
+2. Clone repository/download files
+3. `server.py` and `client.py` are executable (run with --help for usage)
+
+
 License
 -------
 
