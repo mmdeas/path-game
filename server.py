@@ -21,8 +21,8 @@ from zope.interface import implements
 import error
 import util
 
-VERSION = 1
-CLIENT_VERSIONS = (1,)
+VERSION = 2
+CLIENT_VERSIONS = (2,)
 
 
 class Server(object):
@@ -51,6 +51,7 @@ class Server(object):
         if self.started:
             return
         self.started = True
+        self.turns = 0
         self.players = self.clients.values()
         players = [(c, self.clients[c].colour) for c in self.clients]
         size = self.imageSize
@@ -85,9 +86,10 @@ class Server(object):
             log.msg("No players. Immediate finish.")
             self.finished = True
         while not self.finished:
+            self.turns += 1
             log.msg("Starting next round.")
             turn = []
-            for i in xrange(len(self.players)):
+            for i in xrange(len([p for p in self.players if not p.finished])):
                 try:
                     t = self.gameType.timeout / 1000.0 * 1.5
                     turn.append(self.moves.get(True, t))  # (client, node)
@@ -97,25 +99,33 @@ class Server(object):
                             .format(
                                 len(self.players) - i,
                                 len(self.players),
-                                [c[0] for c in turn])
+                                turn)
                             )
             assert self.moves.empty()
             costdelta = []
             for t in turn:
                 if t == ():  # no-op
                     continue
-                # For now, just race to the finish
                 if t[1] == t[0].end:
-                    t[0].win()
-                    self.finished = True
+                    t[0].calculateScore(self.turns)
+                    t[0].finished = True
                 cost = self.costs[t[1]]
                 colour = t[0].colour
                 newcost = map(lambda a, b: (a+b)/2, cost, colour)
                 costdelta.append((t[1], newcost))
                 self.costs[t[1][0], t[1][1]] = tuple(newcost)
-            if not self.finished:
-                for p in self.players:
-                    p.startNextTurn(costdelta)
+            for p in self.players:
+                p.startNextTurn(costdelta)
+            # finish when all players are done
+            if all([p.finished for p in self.players]):
+                self.finished = True
+        log.msg("Game finished.")
+        scores = [(p.score, p) for p in self.players]
+        scores.sort()
+        log.msg(["Scores:", scores])
+        scores[0][1].win(scores)
+        for s, p in scores[1:]:
+            p.gameOver(scores)
 
     def sendMessage(self, client, message):
         log.msg(["sendMessage", self, client, message])
@@ -197,6 +207,7 @@ class ChatClient(pb.Avatar):
 class GameClient(ChatClient):
     """Client expected to play the game as well as being able to chat."""
     ready = False
+    finished = False
 
     def __init__(self, server, name):
         ChatClient.__init__(self, server, name)
@@ -227,7 +238,10 @@ class GameClient(ChatClient):
 
     def startNextTurn(self, costdelta):
         log.msg(["startNextTurn", costdelta])
-        d = self.remote.callRemote("startNextTurn", costdelta)
+        if self.finished:
+            d = self.remote.callRemote("updateCosts", costdelta)
+        else:
+            d = self.remote.callRemote("startNextTurn", costdelta)
         d.addErrback(self._errored)
 
     def perspective_expandNode(self, node, parent):
@@ -243,8 +257,22 @@ class GameClient(ChatClient):
         self.visited[node] = parent
         self.server.moves.put((self, node))
 
-    def win(self):
-        self.remote.callRemote("win")
+    def calculateScore(self, turns):
+        score = 0
+        node = self.end
+        parent = self.visited[node]
+        while parent != ():
+            score += util.cost(node, parent, self.server.costs)
+            node, parent = parent, self.visited[parent]
+        self.score = score + turns
+
+    def win(self, scores):
+        scores = [(s, p.name) for s, p in scores]
+        self.remote.callRemote("win", scores)
+
+    def gameOver(self, scores):
+        scores = [(s, p.name) for s, p in scores]
+        self.remote.callRemote("gameOver", scores)
 
 
 class GameType(object):

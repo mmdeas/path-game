@@ -31,3 +31,14 @@ class ChildMaker(object):
             if (0 <= child[0] < self.size[0]) and (0 <= child[1] < self.size[1]):
                 children.add(child)
         return children
+
+
+def cost(node, parent, costs):
+    """
+    node: (x, y) coordinates of node
+    parent: (x, y) coordinates of node's parent
+    costs: matrix of colours as from PIL.Image.load
+    """
+    manhattan = abs(node[0] - parent[0]) + abs(node[1] - parent[1])
+    colourDiff = sum(map(lambda a, b: abs(a - b), costs[node], costs[parent]))
+    return manhattan + colourDiff

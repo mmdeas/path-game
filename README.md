@@ -3,7 +3,9 @@ path-game
 
 A server and client for a networked game where the aim is as-yet loosely 
 defined but involves creating a path from a start to an end node better than 
-the other players.
+the other players. Currently, the scoring function involves the length of the
+path, the sum of the differences of the colours in adjacent nodes of the path
+and the turns taken to build the path.
 
 This path is created across an image which can be used to define the cost of 
 the path (cost of traversing a pixel relative to colour or change in colour 

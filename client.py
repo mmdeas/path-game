@@ -19,6 +19,8 @@ import error
 from server import GameType
 import util
 
+VERSION = 2
+
 
 class GameClient(pb.Referenceable):
     visited = set()
@@ -32,8 +34,14 @@ class GameClient(pb.Referenceable):
         log.msg(["print", self, message, colour])
         self.chatui.printMessage(message, colour)
 
-    def remote_win(self):
+    def remote_win(self, scores):
         print "Congrats!"
+        print scores
+        self.gameui.setActive(False)
+
+    def remote_gameOver(self, scores):
+        print "Better luck next time!"
+        print scores
         self.gameui.setActive(False)
 
     def remote_startGame(self, start, end, players, costdelta):
@@ -57,6 +65,10 @@ class GameClient(pb.Referenceable):
         self.later = reactor.callLater(t, self._finishTurn)
         self.gameui.applyCostDelta(costdelta)
         self.gameui.setActive(True)
+
+    def remote_updateCosts(self, costdelta):
+        log.msg(["updateCosts", costdelta])
+        self.gameui.applyCostDelta(costdelta)
 
     def _finishTurn(self):
         log.msg(["_finishTurn", self])
