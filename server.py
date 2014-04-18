@@ -161,9 +161,9 @@ class ChatClient(pb.Avatar):
 
     def __repr__(self):
         try:
-            return "<{0}.{1} instance '{2}''>".format(self.__module__,
-                                                      self.__class__.__name__,
-                                                      self.name)
+            return "<{0}.{1} instance '{2}'>".format(self.__module__,
+                                                     self.__class__.__name__,
+                                                     self.name)
         except AttributeError:
             return "<{0}.{1} instance>".format(self.__module__,
                                                self.__class__.__name__)
