@@ -28,7 +28,14 @@ class GameClient(pb.Referenceable):
     def __init__(self, address="localhost", port=8181):
         log.msg(["GameClient.__init__", self, address, port])
         self.factory = pb.PBClientFactory()
+        self.root = Tkinter.Tk()
+        self.root.protocol("WM_DELETE_WINDOW", self.shutdown)
+        tksupport.install(self.root)
         reactor.connectTCP(address, port, self.factory)
+
+    def sendMessage(self, message):
+        d = self.perspective.callRemote("message", message)
+        d.addErrback(self._errored)
 
     def remote_print(self, message, colour):
         log.msg(["print", self, message, colour])
@@ -116,14 +123,14 @@ class GameClient(pb.Referenceable):
         self.canPlay = canPlay
         if canPlay:
             log.msg("Acting as game client.")
-            self.gameui = GameUI(self)
+            self.gameui = GameUI(self, self.root)
             d = self.perspective.callRemote("getGameType")
             d.addCallback(self._setGameType)
             d.addErrback(self._errored)
         else:
             log.msg("Acting as chat-only client.")
         # Have chat functionality for both
-        self.chatui = ChatUI(self)
+        self.chatui = ChatUI(self, self.root)
 
     def _setGameType(self, gameType):
         log.msg(["_setGameType", self, repr(gameType)[:100]])
@@ -159,16 +166,14 @@ class GameUI(object):
     active = False
     edited = []
 
-    def __init__(self, conduit):
+    def __init__(self, conduit, root):
         """conduit: a GameClient with a connection to a server."""
         super(GameUI, self).__init__()
-        log.msg(["GameUI.__init__", self, conduit])
+        log.msg(["GameUI.__init__", self, conduit, root])
         self.conduit = conduit
-        self.root = Tkinter.Tk()
-        tksupport.install(self.root)
-        self.root.protocol("WM_DELETE_WINDOW", self.conduit.shutdown)
-        self.root.title("Most exciting game you've ever played.")
-        self.canvas = Tkinter.Canvas(self.root, offset="10,10")
+        self.window = Tkinter.Toplevel(root)
+        self.window.title("Most exciting game you've ever played.")
+        self.canvas = Tkinter.Canvas(self.window, offset="10,10")
         self.item = self.canvas.create_image(0, 0, anchor=Tkinter.NW)
         self.canvas.pack()
         self.canvas.bind("<Button 1>", self._onClick)
@@ -243,21 +248,30 @@ class GameUI(object):
         self._updateImage()
 
 
-class ChatUI(basic.LineReceiver):
-    # os.linesep used as line delimeter
-    from os import linesep as delimeter
-
-    def __init__(self, conduit):
+class ChatUI(object):
+    def __init__(self, conduit, root):
         log.msg(["ChatUI.__init__", self, conduit])
         self.conduit = conduit
+        self.window = root
+        self.chatlog = Tkinter.Text(self.window, state='disabled', wrap='word', width=80, height=24)
+        self.typebox = Tkinter.Entry(self.window, width=80)
+        self.typebox.bind('<Return>', self.returnPressed)
+        self.typebox.pack(fill='both', expand='yes')
+        self.chatlog.pack(fill='both', expand='yes')
 
     def printMessage(self, message, colour):
+        # TODO: use colour
         log.msg(["printMessage", self, message, colour])
+        self.chatlog['state'] = 'normal'
+        self.chatlog.insert('end', message)
+        self.chatlog.insert('end', '\n')
+        self.chatlog['state'] = 'disabled'
         print message
 
-    def lineReceived(self, line):
-        log.msg(["lineReceived", self, line])
-        self.conduit.sendMessage(line.strip())
+    def returnPressed(self, event):
+        log.msg(["returnPressed", self, event])
+        self.conduit.sendMessage(self.typebox.get())
+        self.typebox.delete('0', 'end')
 
 
 if __name__ == '__main__':
