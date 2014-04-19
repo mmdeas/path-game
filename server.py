@@ -129,8 +129,8 @@ class Server(object):
 
     def sendMessage(self, client, message):
         log.msg(["sendMessage", self, client, message])
-        message = '<{1}> {2}'.format(client.name, message)
-        for c in self.clients:
+        message = '<{0}> {1}'.format(client.name, message)
+        for c in self.clients.values():
             c.sendChat(message, client.colour)
 
     def addClient(self, client):
