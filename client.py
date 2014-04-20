@@ -110,8 +110,8 @@ class GameClient(pb.Referenceable):
         while name is None:
             dialog = NameDialog(self.root)
             name = dialog.result
-        if name in self.repl:
-            name = self.repl[name]
+        if name.lower() in self.repl:
+            name = self.repl[name.lower()]
         self.name = name
         d = self.factory.login(credentials.UsernamePassword(self.name, ''),
                                client=self)
@@ -262,11 +262,14 @@ class GameUI(object):
 
 
 class ChatUI(object):
+    tags = {}
+
     def __init__(self, conduit, root):
         log.msg(["ChatUI.__init__", self, conduit])
         self.conduit = conduit
         self.window = root
-        self.chatlog = Tkinter.Text(self.window, state='disabled', wrap='word', width=80, height=24)
+        self.chatlog = Tkinter.Text(self.window, state='disabled', wrap='word',
+                                    width=80, height=24)
         self.typebox = Tkinter.Entry(self.window, width=80)
         self.typebox.bind('<Return>', self.returnPressed)
         self.typebox.pack(fill='both', expand='yes')
@@ -275,8 +278,9 @@ class ChatUI(object):
     def printMessage(self, message, colour):
         # TODO: use colour
         log.msg(["printMessage", self, message, colour])
+        tag = self.getTag(colour)
         self.chatlog['state'] = 'normal'
-        self.chatlog.insert('end', message)
+        self.chatlog.insert('end', message, (tag, ))
         self.chatlog.insert('end', '\n')
         self.chatlog['state'] = 'disabled'
         print message
@@ -285,6 +289,23 @@ class ChatUI(object):
         log.msg(["returnPressed", self, event])
         self.conduit.sendMessage(self.typebox.get())
         self.typebox.delete('0', 'end')
+
+    def getTag(self, colour):
+        try:
+            return self.tags[colour]
+        except KeyError:
+            r, g, b = colour
+            yiq = (r * 299 + g * 587 + b * 114) / 1000
+            if yiq > 128:
+                fg = 'black'
+            else:
+                fg = 'white'
+            hexcolour = '#' + ''.join('%02x' % c for c in colour)
+            name = ''.join(('tag', hexcolour))
+            self.chatlog.tag_configure(name, background=hexcolour,
+                                       foreground=fg)
+            self.tags[colour] = name
+            return name
 
 
 class NameDialog(Dialog):
