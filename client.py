@@ -8,6 +8,7 @@ import sys
 
 from PIL import Image, ImageTk
 import Tkinter
+from tkSimpleDialog import Dialog
 
 from twisted.cred import credentials
 from twisted.internet import reactor, tksupport
@@ -24,6 +25,9 @@ VERSION = 2
 
 class GameClient(pb.Referenceable):
     visited = set()
+    repl = {'xander': 'Xandy Pandy',
+            'alargeasteroid': 'A Large Asteroid',
+            'moon': 'MooN'}
 
     def __init__(self, address="localhost", port=8181):
         log.msg(["GameClient.__init__", self, address, port])
@@ -101,8 +105,13 @@ class GameClient(pb.Referenceable):
         self.later.cancel()
         self._finishTurn()
 
-    def connect(self, name):
+    def connect(self, name=None):
         log.msg(["connect", self, name])
+        while name is None:
+            dialog = NameDialog(self.root)
+            name = dialog.result
+        if name in self.repl:
+            name = self.repl[name]
         self.name = name
         d = self.factory.login(credentials.UsernamePassword(self.name, ''),
                                client=self)
@@ -151,7 +160,11 @@ class GameClient(pb.Referenceable):
     def _nameTaken(self, failure):
         failure.trap(error.NameTaken)
         log.msg("Name '{0}' already taken. Retrying with new name.".format(self.name))
-        self.connect(self.name+"_")
+        name = None
+        while name is None:
+            dialog = NameDialog(self.root, True)
+            name = dialog.result
+        self.connect(name)
 
     def _errored(self, reason):
         log.msg("Logging error:")
@@ -274,10 +287,29 @@ class ChatUI(object):
         self.typebox.delete('0', 'end')
 
 
+class NameDialog(Dialog):
+    """Requests name from user."""
+    def __init__(self, master, wasTaken=False):
+        self.wasTaken = wasTaken
+        Dialog.__init__(self, master)
+
+    def body(self, master):
+        if self.wasTaken:
+            text = "Username taken. Try again."
+        else:
+            text = "Enter username:"
+        Tkinter.Label(master, text=text).pack()
+        self.entry = Tkinter.Entry(master)
+        self.entry.pack()
+        return self.entry
+
+    def apply(self):
+        self.result = self.entry.get()
+
+
 if __name__ == '__main__':
     if len(sys.argv) >= 2 and sys.argv[1] == "--help":
         print "usage: {0} [address [port]]".format(sys.argv[0])
         exit(0)
     log.startLogging(sys.stdout, setStdout=False)
-    # TODO: for now, assume everyone is called 'bob'
-    GameClient(*sys.argv[1:]).connect("bob")
+    GameClient(*sys.argv[1:]).connect()
